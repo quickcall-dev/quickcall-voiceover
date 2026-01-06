@@ -132,6 +132,40 @@ generate_voiceover(
 )
 ```
 
+## Docker Usage
+
+Build the image:
+
+```bash
+docker build -t quickcall-voiceover .
+```
+
+Run with a config file:
+
+```bash
+docker run -v $(pwd)/config:/config -v $(pwd)/output:/app/output quickcall-voiceover /config/voiceover.json
+```
+
+With combined output:
+
+```bash
+docker run -v $(pwd)/config:/config -v $(pwd)/output:/app/output quickcall-voiceover /config/voiceover.json --combine
+```
+
+## Changing Voice Models
+
+To use a different voice, simply change the `model` field in your config:
+
+```json
+{
+  "voice": {
+    "model": "en_US-amy-medium"
+  }
+}
+```
+
+The model will be automatically downloaded on first use. Browse all available voices at [Piper samples](https://rhasspy.github.io/piper-samples/).
+
 ## License
 
 Apache-2.0
