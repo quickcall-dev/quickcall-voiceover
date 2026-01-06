@@ -125,6 +125,10 @@ def generate_from_text(
     combine: bool = False,
     combined_filename: str = "combined_voiceover.wav",
     console: Console | None = None,
+    length_scale: float | None = None,
+    noise_scale: float | None = None,
+    noise_w: float | None = None,
+    sentence_silence: float | None = None,
 ) -> bool:
     """
     Generate voice-over audio from a list of text lines.
@@ -137,6 +141,10 @@ def generate_from_text(
         combine: If True, also create a single combined audio file
         combined_filename: Name for the combined output file
         console: Rich console for styled output
+        length_scale: Speech speed (lower = faster), default 1.0
+        noise_scale: Voice variation, default 0.667
+        noise_w: Phoneme width noise, default 0.8
+        sentence_silence: Silence between sentences in seconds, default 0.5
 
     Returns:
         True if all segments generated successfully
@@ -175,6 +183,10 @@ def generate_from_text(
             text=text,
             output_path=output_file,
             model_path=model_path,
+            length_scale=length_scale if length_scale is not None else 1.0,
+            noise_scale=noise_scale if noise_scale is not None else 0.667,
+            noise_w=noise_w if noise_w is not None else 0.8,
+            sentence_silence=sentence_silence if sentence_silence is not None else 0.5,
         )
 
         if success:
