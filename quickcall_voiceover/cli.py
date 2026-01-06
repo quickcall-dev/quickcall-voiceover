@@ -84,8 +84,11 @@ def file_text_mode(
     combine: bool,
     combined_name: str,
     voice: str | None = None,
+    config_path: Path | None = None,
 ) -> int:
-    """Generate voice-over from a text file."""
+    """Generate voice-over from a text file, optionally with voice config from JSON."""
+    import json
+
     show_banner()
 
     if not text_file.exists():
@@ -99,15 +102,30 @@ def file_text_mode(
         console.print("[red]No text found in file. Exiting.[/red]")
         return 1
 
-    # Use provided voice or default
-    selected_voice = voice or DEFAULT_VOICE
+    # Load voice settings from config if provided
+    voice_settings = {}
+    if config_path:
+        if not config_path.exists():
+            console.print(f"[red]Error: Config file not found: {config_path}[/red]")
+            return 1
+        try:
+            config = json.loads(config_path.read_text())
+            voice_settings = config.get("voice", {})
+        except json.JSONDecodeError as e:
+            console.print(f"[red]Error parsing config file: {e}[/red]")
+            return 1
+
+    # Use provided voice, or from config, or default
+    selected_voice = voice or voice_settings.get("model") or DEFAULT_VOICE
+
+    config_info = f"\nConfig: [cyan]{config_path}[/cyan]" if config_path else ""
 
     console.print(
         Panel(
             f"[bold]File Mode[/bold]\n\n"
-            f"File: [cyan]{text_file}[/cyan]\n"
+            f"Text: [cyan]{text_file}[/cyan]\n"
             f"Lines: [cyan]{len(lines)}[/cyan]\n"
-            f"Voice: [cyan]{selected_voice}[/cyan]\n"
+            f"Voice: [cyan]{selected_voice}[/cyan]{config_info}\n"
             f"Output: [cyan]{output_dir or './output'}[/cyan]\n"
             f"Combine: [cyan]{combine}[/cyan]",
             title="Settings",
@@ -116,7 +134,7 @@ def file_text_mode(
     )
     console.print()
 
-    # Generate
+    # Generate with voice settings from config
     success = generate_from_text(
         lines=lines,
         voice=selected_voice,
@@ -124,6 +142,10 @@ def file_text_mode(
         combine=combine,
         combined_filename=combined_name,
         console=console,
+        length_scale=voice_settings.get("length_scale"),
+        noise_scale=voice_settings.get("noise_scale"),
+        noise_w=voice_settings.get("noise_w"),
+        sentence_silence=voice_settings.get("sentence_silence"),
     )
 
     if success:
@@ -262,6 +284,7 @@ Examples:
   quickcall-voiceover config.json --combine    Generate and combine into one file
   quickcall-voiceover -t script.txt -c         Generate from text file and combine
   quickcall-voiceover -t script.txt -v en_US-amy-medium  Use specific voice
+  quickcall-voiceover config.json -t script.txt -c       Use voice config with text file
   quickcall-voiceover --text                   Interactive text mode
   quickcall-voiceover --voices                 Show available voices
         """,
@@ -341,6 +364,7 @@ Examples:
                 combine=args.combine,
                 combined_name=args.combined_name,
                 voice=args.voice,
+                config_path=args.config,
             )
 
     # Config mode requires a config file
