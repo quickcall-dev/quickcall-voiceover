@@ -6,7 +6,14 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
+DIM='\033[2m'
 NC='\033[0m' # No Color
+
+# Helper to print command before running
+run_cmd() {
+    echo -e "${DIM}\$ $@${NC}"
+    "$@"
+}
 
 echo -e "${CYAN}"
 echo "╭──────────────────────────────────────────────────────────╮"
@@ -20,22 +27,25 @@ TEST_DIR="/tmp/quickcall-voiceover-test"
 # Cleanup previous test
 if [ -d "$TEST_DIR" ]; then
     echo -e "${YELLOW}Cleaning up previous test directory...${NC}"
-    rm -rf "$TEST_DIR"
+    run_cmd rm -rf "$TEST_DIR"
 fi
 
 # Create test directory
-echo -e "${CYAN}Creating test directory: $TEST_DIR${NC}"
-mkdir -p "$TEST_DIR"
+echo -e "${CYAN}Creating test directory${NC}"
+run_cmd mkdir -p "$TEST_DIR"
 cd "$TEST_DIR"
+echo ""
 
 # Initialize uv project
-echo -e "${CYAN}Initializing uv project...${NC}"
-uv init --name voiceover-test
+echo -e "${CYAN}Initializing uv project${NC}"
+run_cmd uv init --name voiceover-test
+echo ""
 
 # Install from local path
 PACKAGE_PATH="/Users/sagar/work/all-things-quickcall/voice-over"
-echo -e "${CYAN}Installing quickcall-voiceover from: $PACKAGE_PATH${NC}"
-uv add "$PACKAGE_PATH"
+echo -e "${CYAN}Installing quickcall-voiceover${NC}"
+run_cmd uv add "$PACKAGE_PATH"
+echo ""
 
 # Verify installation
 echo -e "${GREEN}✓ Package installed${NC}"
@@ -43,12 +53,12 @@ echo ""
 
 # Test 1: Show help
 echo -e "${YELLOW}━━━ Test 1: CLI Help ━━━${NC}"
-uv run quickcall-voiceover --help
+run_cmd uv run quickcall-voiceover --help
 echo ""
 
 # Test 2: Show voices
 echo -e "${YELLOW}━━━ Test 2: Show Voices ━━━${NC}"
-uv run quickcall-voiceover --voices
+run_cmd uv run quickcall-voiceover --voices
 echo ""
 
 # Test 3: Config-based generation
@@ -85,15 +95,14 @@ cat > test_config.json << 'CONFIGEOF'
 CONFIGEOF
 
 echo -e "${CYAN}Created test_config.json${NC}"
-cat test_config.json
+run_cmd cat test_config.json
 echo ""
 
-echo -e "${CYAN}Running: uv run quickcall-voiceover test_config.json --combine${NC}"
-uv run quickcall-voiceover test_config.json --combine
-
+run_cmd uv run quickcall-voiceover test_config.json --combine
 echo ""
+
 echo -e "${GREEN}Generated files:${NC}"
-ls -lah output/
+run_cmd ls -lah output/
 echo ""
 
 # Test 4: Programmatic API test
@@ -121,12 +130,15 @@ success = generate_from_text(
 print(f"\nProgrammatic test: {'SUCCESS' if success else 'FAILED'}")
 PYEOF
 
-echo -e "${CYAN}Running programmatic test...${NC}"
-uv run python test_programmatic.py
-
+echo -e "${CYAN}Created test_programmatic.py${NC}"
+run_cmd cat test_programmatic.py
 echo ""
+
+run_cmd uv run python test_programmatic.py
+echo ""
+
 echo -e "${GREEN}Programmatic output:${NC}"
-ls -lah output_programmatic/
+run_cmd ls -lah output_programmatic/
 echo ""
 
 # Summary
