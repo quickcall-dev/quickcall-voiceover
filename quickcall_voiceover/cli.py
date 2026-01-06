@@ -78,6 +78,67 @@ def select_voice() -> str:
     return voice_list[int(choice) - 1]
 
 
+def file_text_mode(
+    text_file: Path,
+    output_dir: Path | None,
+    combine: bool,
+    combined_name: str,
+    voice: str | None = None,
+) -> int:
+    """Generate voice-over from a text file."""
+    show_banner()
+
+    if not text_file.exists():
+        console.print(f"[red]Error: Text file not found: {text_file}[/red]")
+        return 1
+
+    # Read lines from file
+    lines = [line.strip() for line in text_file.read_text().splitlines() if line.strip()]
+
+    if not lines:
+        console.print("[red]No text found in file. Exiting.[/red]")
+        return 1
+
+    # Use provided voice or default
+    selected_voice = voice or DEFAULT_VOICE
+
+    console.print(
+        Panel(
+            f"[bold]File Mode[/bold]\n\n"
+            f"File: [cyan]{text_file}[/cyan]\n"
+            f"Lines: [cyan]{len(lines)}[/cyan]\n"
+            f"Voice: [cyan]{selected_voice}[/cyan]\n"
+            f"Output: [cyan]{output_dir or './output'}[/cyan]\n"
+            f"Combine: [cyan]{combine}[/cyan]",
+            title="Settings",
+            border_style="blue",
+        )
+    )
+    console.print()
+
+    # Generate
+    success = generate_from_text(
+        lines=lines,
+        voice=selected_voice,
+        output_dir=output_dir or Path("./output"),
+        combine=combine,
+        combined_filename=combined_name,
+        console=console,
+    )
+
+    if success:
+        console.print(
+            Panel(
+                "[bold green]✓ All segments generated successfully![/bold green]",
+                border_style="green",
+            )
+        )
+    else:
+        console.print(Panel("[bold red]✗ Some segments failed[/bold red]", border_style="red"))
+
+    return 0 if success else 1
+
+
 def interactive_text_mode() -> int:
     """Interactive text-based voice-over generation."""
     show_banner()
@@ -199,6 +260,8 @@ def main() -> int:
 Examples:
   quickcall-voiceover config.json              Generate from config file
   quickcall-voiceover config.json --combine    Generate and combine into one file
+  quickcall-voiceover -t script.txt -c         Generate from text file and combine
+  quickcall-voiceover -t script.txt -v en_US-amy-medium  Use specific voice
   quickcall-voiceover --text                   Interactive text mode
   quickcall-voiceover --voices                 Show available voices
         """,
@@ -212,8 +275,18 @@ Examples:
     parser.add_argument(
         "-t",
         "--text",
-        action="store_true",
-        help="Interactive text mode: enter text line by line",
+        type=Path,
+        nargs="?",
+        const=True,
+        default=None,
+        help="Text mode: provide a .txt file path, or use without argument for interactive input",
+    )
+    parser.add_argument(
+        "-v",
+        "--voice",
+        type=str,
+        default=None,
+        help=f"Voice model to use (default: {DEFAULT_VOICE})",
     )
     parser.add_argument(
         "-o",
@@ -255,9 +328,20 @@ Examples:
         show_voice_table()
         return 0
 
-    # Text mode
-    if args.text:
-        return interactive_text_mode()
+    # Text mode - file or interactive
+    if args.text is not None:
+        if args.text is True:
+            # Interactive mode (no file provided)
+            return interactive_text_mode()
+        else:
+            # File mode
+            return file_text_mode(
+                text_file=args.text,
+                output_dir=args.output,
+                combine=args.combine,
+                combined_name=args.combined_name,
+                voice=args.voice,
+            )
 
     # Config mode requires a config file
     if not args.config:
