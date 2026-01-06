@@ -6,7 +6,7 @@ readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
 authors = [
-    { name = "QuickCall", email = "hello@quickcall.dev" }
+    { name = "Sagar Sarkale", email = "hello@quickcall.dev" }
 ]
 keywords = ["voiceover", "tts", "piper", "audio", "quickcall"]
 classifiers = [
@@ -21,6 +21,7 @@ classifiers = [
 ]
 dependencies = [
     "piper-tts>=1.3.0",
+    "rich>=14.2.0",
 ]
 
 [project.urls]
@@ -44,3 +45,9 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.5.1",
+    "ruff>=0.14.10",
+]

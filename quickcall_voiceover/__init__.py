@@ -2,6 +2,6 @@
 
 __version__ = "0.1.0"
 
-from quickcall_voiceover.generator import generate_voiceover
+from quickcall_voiceover.generator import generate_from_text, generate_voiceover
 
-__all__ = ["generate_voiceover", "__version__"]
+__all__ = ["generate_voiceover", "generate_from_text", "__version__"]

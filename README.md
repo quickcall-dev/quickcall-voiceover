@@ -168,4 +168,6 @@ The model will be automatically downloaded on first use. Browse all available vo
 
 ## License
 
-Apache-2.0
+This project is licensed under Apache-2.0.
+
+**Note:** This tool depends on [Piper TTS](https://github.com/OHF-Voice/piper1-gpl) which is licensed under GPL-3.0. Piper is installed as a separate dependency and is not bundled with this package.
