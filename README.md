@@ -302,7 +302,7 @@ This project is licensed under Apache-2.0.
 
 **Note:** This tool depends on:
 - [Piper TTS](https://github.com/OHF-Voice/piper1-gpl) - GPL-3.0 license
-- [Kokoro](https://github.com/hexgrad/kokoro) - Apache-2.0 license
+- [Kokoro](https://github.com/hexgrad/kokoro) - Apache-2.0 license (trained on CC BY licensed datasets)
 
 These are installed as separate dependencies and are not bundled with this package.
 
