@@ -5,7 +5,7 @@
 <h3 align="center">QuickCall VoiceOver</h3>
 
 <p align="center">
-  <em>Utility tool for creating voice-over audio assets for QuickCall videos</em>
+  <em>Multi-backend TTS tool for creating voice-over audio assets</em>
 </p>
 
 <p align="center">
@@ -18,6 +18,7 @@
 <p align="center">
   <a href="#install">Install</a> |
   <a href="#quick-start">Quick Start</a> |
+  <a href="#backends">Backends</a> |
   <a href="#cli-options">CLI Options</a> |
   <a href="#voice-models">Voice Models</a> |
   <a href="#configuration">Configuration</a> |
@@ -29,39 +30,69 @@
 
 ## Install
 
+### Basic (Piper only)
+
 ```bash
 uv pip install quickcall-voiceover
+```
+
+### With Kokoro support
+
+```bash
+uv pip install quickcall-voiceover[kokoro]
+
+# macOS: Also install espeak-ng
+brew install espeak-ng
 ```
 
 Or with pip:
 
 ```bash
-pip install quickcall-voiceover
+pip install quickcall-voiceover[kokoro]
 ```
 
 ## Quick Start
 
 ### Config Mode
 
-Create a JSON config file with your segments:
-
 ```bash
+# Piper (default)
 quickcall-voiceover config.json --combine
+
+# Kokoro
+quickcall-voiceover -b kokoro -v af_heart config.json --combine
 ```
 
-### Text Mode (Interactive)
+### Text File Mode
 
-Generate voice-over from text lines interactively:
+```bash
+# Piper
+quickcall-voiceover -t script.txt -c -o ./output
+
+# Kokoro with af_heart voice
+quickcall-voiceover -b kokoro -v af_heart -t script.txt -c -o ./output
+```
+
+### Interactive Mode
 
 ```bash
 quickcall-voiceover --text
+quickcall-voiceover -b kokoro --text
 ```
 
 ### Show Available Voices
 
 ```bash
-quickcall-voiceover --voices
+quickcall-voiceover --voices           # Piper voices
+quickcall-voiceover -b kokoro --voices # Kokoro voices
 ```
+
+## Backends
+
+| Backend | Model | Quality | Speed | Install |
+|---------|-------|---------|-------|---------|
+| **Piper** | Various | Medium-High | Fast | Default |
+| **Kokoro** | Kokoro-82M | High | Medium | `[kokoro]` extra |
 
 ## CLI Options
 
@@ -72,7 +103,9 @@ Arguments:
   CONFIG                Path to JSON configuration file
 
 Options:
-  -t, --text            Interactive text mode (line by line input)
+  -b, --backend         TTS backend: piper, kokoro (default: piper)
+  -t, --text [FILE]     Text mode: provide .txt file or use interactively
+  -v, --voice VOICE     Voice model (default depends on backend)
   -o, --output DIR      Output directory (default: ./output)
   -m, --models DIR      Models directory (default: ./models)
   -c, --combine         Create a combined audio file from all segments
@@ -84,22 +117,25 @@ Options:
 ### Examples
 
 ```bash
-# Generate from config file
-quickcall-voiceover voiceover.json
+# Piper (default backend)
+quickcall-voiceover config.json --combine
+quickcall-voiceover -t script.txt -v en_US-ryan-high -c
 
-# Generate and combine into one file
-quickcall-voiceover voiceover.json --combine
+# Kokoro backend
+quickcall-voiceover -b kokoro -v af_heart config.json -c
+quickcall-voiceover -b kokoro -v am_michael -t script.txt -c
+
+# Use config for voice settings, text file for content
+quickcall-voiceover voice_config.json -t script.txt -c
 
 # Interactive text mode
 quickcall-voiceover --text
-
-# Show available voices
-quickcall-voiceover --voices
+quickcall-voiceover -b kokoro --text
 ```
 
 ## Voice Models
 
-Popular voice models available:
+### Piper Voices
 
 | Model ID | Name | Description |
 |----------|------|-------------|
@@ -113,7 +149,25 @@ Popular voice models available:
 | `en_GB-alba-medium` | Alba (UK) | British female voice |
 | `en_GB-cori-high` | Cori (UK) | High quality British female |
 
-Browse all voices at [Piper samples](https://rhasspy.github.io/piper-samples/).
+Browse all Piper voices at [Piper samples](https://rhasspy.github.io/piper-samples/).
+
+### Kokoro Voices
+
+| Voice ID | Name | Description |
+|----------|------|-------------|
+| `af_heart` | Heart (US Female) | Warm, expressive (default) |
+| `af_bella` | Bella (US Female) | Clear American female |
+| `af_nicole` | Nicole (US Female) | Professional American female |
+| `af_sarah` | Sarah (US Female) | Friendly American female |
+| `af_sky` | Sky (US Female) | Bright American female |
+| `am_adam` | Adam (US Male) | Clear American male |
+| `am_michael` | Michael (US Male) | Professional American male |
+| `bf_emma` | Emma (UK Female) | British female |
+| `bf_isabella` | Isabella (UK Female) | Elegant British female |
+| `bm_george` | George (UK Male) | British male |
+| `bm_lewis` | Lewis (UK Male) | Clear British male |
+
+More info at [Kokoro-82M on HuggingFace](https://huggingface.co/hexgrad/Kokoro-82M).
 
 ## Configuration
 
@@ -122,6 +176,7 @@ Browse all voices at [Piper samples](https://rhasspy.github.io/piper-samples/).
 ```json
 {
   "voice": {
+    "backend": "piper",
     "model": "en_US-hfc_male-medium",
     "length_scale": 1.0,
     "noise_scale": 0.667,
@@ -139,10 +194,27 @@ Browse all voices at [Piper samples](https://rhasspy.github.io/piper-samples/).
     {
       "id": "02_main",
       "text": "This is the main content."
-    },
+    }
+  ]
+}
+```
+
+### Kokoro Config
+
+```json
+{
+  "voice": {
+    "backend": "kokoro",
+    "model": "af_heart",
+    "speed": 1.0
+  },
+  "output": {
+    "format": "wav"
+  },
+  "segments": [
     {
-      "id": "03_outro",
-      "text": "Thanks for watching!"
+      "id": "01_intro",
+      "text": "Welcome to the demo."
     }
   ]
 }
@@ -150,19 +222,24 @@ Browse all voices at [Piper samples](https://rhasspy.github.io/piper-samples/).
 
 ### Voice Settings
 
+#### Piper Settings
+
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `model` | string | `en_US-hfc_male-medium` | Piper voice model name |
+| `backend` | string | `piper` | TTS backend |
+| `model` | string | `en_US-hfc_male-medium` | Piper voice model |
 | `length_scale` | float | `1.0` | Speech speed (lower = faster) |
 | `noise_scale` | float | `0.667` | Voice variation |
 | `noise_w` | float | `0.8` | Phoneme width noise |
 | `sentence_silence` | float | `0.5` | Silence between sentences (seconds) |
 
-### Segment Format
+#### Kokoro Settings
 
-Each segment requires:
-- `id`: Unique identifier (used as filename)
-- `text`: The text to convert to speech
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `backend` | string | `kokoro` | TTS backend |
+| `model` | string | `af_heart` | Kokoro voice ID |
+| `speed` | float | `1.0` | Speech speed multiplier |
 
 ## Programmatic Usage
 
@@ -170,25 +247,34 @@ Each segment requires:
 from pathlib import Path
 from quickcall_voiceover import generate_voiceover, generate_from_text
 
-# From config file
+# Piper (default)
 generate_voiceover(
-    config_path=Path("voiceover.json"),
+    config_path=Path("config.json"),
     output_dir=Path("./output"),
     combine=True,
 )
 
-# From text lines
+# Kokoro
+generate_voiceover(
+    config_path=Path("config.json"),
+    output_dir=Path("./output"),
+    combine=True,
+    backend="kokoro",
+    voice="af_heart",
+)
+
+# From text lines with Kokoro
 lines = [
     "First line of voice over.",
     "Second line of voice over.",
-    "Final line."
 ]
 
 generate_from_text(
     lines=lines,
-    voice="en_US-hfc_male-medium",
+    voice="af_heart",
     output_dir=Path("./output"),
     combine=True,
+    backend="kokoro",
 )
 ```
 
@@ -211,7 +297,11 @@ docker run -v $(pwd)/config:/config -v $(pwd)/output:/app/output \
 
 This project is licensed under Apache-2.0.
 
-**Note:** This tool depends on [Piper TTS](https://github.com/OHF-Voice/piper1-gpl) which is licensed under GPL-3.0. Piper is installed as a separate dependency and is not bundled with this package.
+**Note:** This tool depends on:
+- [Piper TTS](https://github.com/OHF-Voice/piper1-gpl) - GPL-3.0 license
+- [Kokoro](https://github.com/hexgrad/kokoro) - Apache-2.0 license
+
+These are installed as separate dependencies and are not bundled with this package.
 
 ---
 
