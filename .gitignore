@@ -1,4 +1,5 @@
 output/
+.githooks/
 output_*/
 # Python-generated files
 __pycache__/

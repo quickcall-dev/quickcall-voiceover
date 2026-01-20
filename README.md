@@ -30,13 +30,13 @@
 
 ## Install
 
-### Basic (Piper only)
+### Install with Piper backend
 
 ```bash
-uv pip install quickcall-voiceover
+uv pip install quickcall-voiceover[piper]
 ```
 
-### With Kokoro support
+### Install with Kokoro backend
 
 ```bash
 uv pip install quickcall-voiceover[kokoro]
@@ -45,10 +45,13 @@ uv pip install quickcall-voiceover[kokoro]
 brew install espeak-ng
 ```
 
-Or with pip:
+### Install with all backends
 
 ```bash
-pip install quickcall-voiceover[kokoro]
+uv pip install quickcall-voiceover[all]
+
+# macOS: Also install espeak-ng for Kokoro
+brew install espeak-ng
 ```
 
 ## Quick Start
