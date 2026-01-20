@@ -1,10 +1,8 @@
-"""Voice-over generation using Piper TTS."""
+"""Voice-over generation with pluggable TTS backends."""
 
 from __future__ import annotations
 
 import json
-import subprocess
-import sys
 import wave
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -12,80 +10,13 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from rich.console import Console
 
+from quickcall_voiceover.backends import TTSBackend, get_backend
+
 
 def load_config(config_path: Path) -> dict:
     """Load configuration from JSON file."""
     with open(config_path, "r") as f:
         return json.load(f)
-
-
-def ensure_voice_downloaded(model: str, models_dir: Path, console: Console | None = None) -> Path:
-    """Download voice model if not present, return path to onnx file."""
-    from piper.download_voices import download_voice
-
-    model_file = models_dir / f"{model}.onnx"
-    if model_file.exists():
-        if console:
-            console.print(f"[green]✓[/green] Voice model cached: [cyan]{model}[/cyan]")
-        else:
-            print(f"Voice model already downloaded: {model}")
-        return model_file
-
-    if console:
-        console.print(f"[yellow]↓[/yellow] Downloading voice model: [cyan]{model}[/cyan]...")
-    else:
-        print(f"Downloading voice model: {model}...")
-
-    download_voice(model, models_dir)
-
-    if console:
-        console.print(f"[green]✓[/green] Downloaded to: [dim]{models_dir}[/dim]")
-    else:
-        print(f"Downloaded to: {models_dir}")
-
-    return model_file
-
-
-def generate_segment(
-    text: str,
-    output_path: Path,
-    model_path: Path,
-    length_scale: float = 1.0,
-    noise_scale: float = 0.667,
-    noise_w: float = 0.8,
-    sentence_silence: float = 0.5,
-) -> bool:
-    """Generate a single audio segment using piper CLI."""
-    cmd = [
-        sys.executable,
-        "-m",
-        "piper",
-        "--model",
-        str(model_path),
-        "--output_file",
-        str(output_path),
-        "--length_scale",
-        str(length_scale),
-        "--noise_scale",
-        str(noise_scale),
-        "--noise_w",
-        str(noise_w),
-        "--sentence_silence",
-        str(sentence_silence),
-    ]
-
-    try:
-        subprocess.run(
-            cmd,
-            input=text,
-            text=True,
-            capture_output=True,
-            check=True,
-        )
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"Error generating audio: {e.stderr}")
-        return False
 
 
 def combine_wav_files(
@@ -119,32 +50,38 @@ def combine_wav_files(
 
 def generate_from_text(
     lines: list[str],
-    voice: str = "en_US-hfc_male-medium",
+    voice: str | None = None,
     output_dir: Path | None = None,
     models_dir: Path | None = None,
     combine: bool = False,
     combined_filename: str = "combined_voiceover.wav",
     console: Console | None = None,
+    backend: str = "piper",
+    # Piper-specific params (for backward compatibility)
     length_scale: float | None = None,
     noise_scale: float | None = None,
     noise_w: float | None = None,
     sentence_silence: float | None = None,
+    # Kokoro-specific params
+    speed: float | None = None,
 ) -> bool:
     """
     Generate voice-over audio from a list of text lines.
 
     Args:
         lines: List of text strings, each becomes a segment
-        voice: Voice model name
+        voice: Voice model name (default depends on backend)
         output_dir: Directory for output files (default: ./output)
         models_dir: Directory for voice models (default: ./models)
         combine: If True, also create a single combined audio file
         combined_filename: Name for the combined output file
         console: Rich console for styled output
-        length_scale: Speech speed (lower = faster), default 1.0
-        noise_scale: Voice variation, default 0.667
-        noise_w: Phoneme width noise, default 0.8
-        sentence_silence: Silence between sentences in seconds, default 0.5
+        backend: TTS backend to use ("piper" or "kokoro")
+        length_scale: [Piper] Speech speed (lower = faster), default 1.0
+        noise_scale: [Piper] Voice variation, default 0.667
+        noise_w: [Piper] Phoneme width noise, default 0.8
+        sentence_silence: [Piper] Silence between sentences, default 0.5
+        speed: [Kokoro] Speech speed multiplier, default 1.0
 
     Returns:
         True if all segments generated successfully
@@ -157,12 +94,37 @@ def generate_from_text(
 
     output_dir = Path(output_dir)
     models_dir = Path(models_dir)
-
     output_dir.mkdir(parents=True, exist_ok=True)
-    models_dir.mkdir(parents=True, exist_ok=True)
 
-    # Download voice model if needed
-    model_path = ensure_voice_downloaded(voice, models_dir, console)
+    # Get backend class and create instance
+    BackendClass = get_backend(backend)
+
+    # Use default voice if not specified
+    if voice is None:
+        voice = BackendClass.default_voice()
+
+    # Build backend kwargs based on type
+    backend_kwargs: dict = {
+        "voice": voice,
+        "models_dir": models_dir,
+        "console": console,
+    }
+
+    if backend == "piper":
+        if length_scale is not None:
+            backend_kwargs["length_scale"] = length_scale
+        if noise_scale is not None:
+            backend_kwargs["noise_scale"] = noise_scale
+        if noise_w is not None:
+            backend_kwargs["noise_w"] = noise_w
+        if sentence_silence is not None:
+            backend_kwargs["sentence_silence"] = sentence_silence
+    elif backend == "kokoro":
+        if speed is not None:
+            backend_kwargs["speed"] = speed
+
+    tts: TTSBackend = BackendClass(**backend_kwargs)
+    tts.setup()
 
     if console:
         console.print(f"\n[bold]Generating {len(lines)} segments...[/bold]\n")
@@ -179,15 +141,7 @@ def generate_from_text(
         if console:
             console.print(f"  [{i}/{len(lines)}] {display_text}")
 
-        success = generate_segment(
-            text=text,
-            output_path=output_file,
-            model_path=model_path,
-            length_scale=length_scale if length_scale is not None else 1.0,
-            noise_scale=noise_scale if noise_scale is not None else 0.667,
-            noise_w=noise_w if noise_w is not None else 0.8,
-            sentence_silence=sentence_silence if sentence_silence is not None else 0.5,
-        )
+        success = tts.generate(text=text, output_path=output_file)
 
         if success:
             if console:
@@ -224,6 +178,8 @@ def generate_voiceover(
     combine: bool = False,
     combined_filename: str = "combined_voiceover.wav",
     console: Console | None = None,
+    backend: str | None = None,
+    voice: str | None = None,
 ) -> bool:
     """
     Generate voice-over audio from a config file.
@@ -235,6 +191,8 @@ def generate_voiceover(
         combine: If True, also create a single combined audio file
         combined_filename: Name for the combined output file
         console: Rich console for styled output
+        backend: TTS backend to use (default: from config or "piper")
+        voice: Voice to use (overrides config)
 
     Returns:
         True if all segments generated successfully
@@ -249,9 +207,7 @@ def generate_voiceover(
 
     output_dir = Path(output_dir)
     models_dir = Path(models_dir)
-
     output_dir.mkdir(parents=True, exist_ok=True)
-    models_dir.mkdir(parents=True, exist_ok=True)
 
     # Load config
     if console:
@@ -259,20 +215,46 @@ def generate_voiceover(
     config = load_config(config_path)
 
     # Voice settings
-    voice = config.get("voice", {})
-    model_name = voice.get("model", "en_US-hfc_male-medium")
+    voice_config = config.get("voice", {})
     output_format = config.get("output", {}).get("format", "wav")
 
-    # Download voice model if needed
-    model_path = ensure_voice_downloaded(model_name, models_dir, console)
+    # Determine backend from config or parameter
+    backend_name = backend or voice_config.get("backend", "piper")
+    BackendClass = get_backend(backend_name)
+
+    # Use voice override, or from config, or default for backend
+    voice_name = voice or voice_config.get("model") or BackendClass.default_voice()
+
+    # Build backend kwargs
+    backend_kwargs: dict = {
+        "voice": voice_name,
+        "models_dir": models_dir,
+        "console": console,
+    }
+
+    # Add backend-specific params from config
+    if backend_name == "piper":
+        for key in ["length_scale", "noise_scale", "noise_w", "sentence_silence"]:
+            if key in voice_config:
+                backend_kwargs[key] = voice_config[key]
+    elif backend_name == "kokoro":
+        if "speed" in voice_config:
+            backend_kwargs["speed"] = voice_config["speed"]
+        if "lang_code" in voice_config:
+            backend_kwargs["lang_code"] = voice_config["lang_code"]
+
+    tts: TTSBackend = BackendClass(**backend_kwargs)
+    tts.setup()
 
     segments = config.get("segments", [])
 
     if console:
+        console.print(f"[dim]Backend: {backend_name} | Voice: {voice_name}[/dim]")
         console.print(f"[dim]Output: {output_dir}[/dim]")
         console.print(f"\n[bold]Generating {len(segments)} segments...[/bold]\n")
     else:
-        print(f"Using voice model: {model_path}")
+        print(f"Backend: {backend_name}")
+        print(f"Voice: {voice_name}")
         print(f"Output directory: {output_dir}")
         print(f"Total segments: {len(segments)}")
         print("-" * 50)
@@ -295,15 +277,7 @@ def generate_voiceover(
             print(f"Generating: {segment_id}")
             print(f"  Text: {display_text}")
 
-        success = generate_segment(
-            text=text,
-            output_path=output_file,
-            model_path=model_path,
-            length_scale=voice.get("length_scale", 1.0),
-            noise_scale=voice.get("noise_scale", 0.667),
-            noise_w=voice.get("noise_w", 0.8),
-            sentence_silence=voice.get("sentence_silence", 0.5),
-        )
+        success = tts.generate(text=text, output_path=output_file)
 
         if success:
             if console:
